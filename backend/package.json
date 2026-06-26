@@ -1,0 +1,18 @@
+{
+  "name": "barber-turn-backend",
+  "version": "1.0.0",
+  "description": "Backend for Barber Turn App",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "init-db": "node src/models/initDb.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}
