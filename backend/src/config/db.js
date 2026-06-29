@@ -1,12 +1,17 @@
 const { Pool } = require('pg');
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:migueldevia50.@db.hndgnqhzaqkdrjwygtmp.supabase.co:5432/postgres';
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  console.error('DATABASE_URL environment variable is required');
+  process.exit(1);
+}
 
 const pool = new Pool({
   connectionString,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  ssl: connectionString.includes('sslmode=disable') 
+    ? false 
+    : { rejectUnauthorized: false }
 });
 
 module.exports = {

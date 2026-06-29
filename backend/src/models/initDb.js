@@ -1,7 +1,7 @@
 const db = require('../config/db');
 
 async function initDb() {
-  console.log('Initializing Supabase PostgreSQL database...');
+  console.log('Initializing database...');
 
   try {
     // Create tables first
@@ -113,7 +113,7 @@ async function initDb() {
       `);
     }
 
-    console.log('Database initialized successfully on Supabase.');
+    console.log('Database initialized successfully.');
   } catch (err) {
     console.error('Error during database initialization:', err);
   } finally {
