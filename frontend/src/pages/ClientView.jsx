@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { requestOTP, verifyOTP, getBarberos, getTurnos, crearTurno, getServicios } from '../services/api';
+import { requestOTP, verifyOTP, getBarberos, getTurnos, crearTurno, getServicios, googleLogin } from '../services/api';
+import { useNavigate } from 'react-router-dom';
+import GoogleLoginButton from '../components/GoogleLoginButton';
 
 export default function ClientView() {
+  const navigate = useNavigate();
   const getStoredUser = () => {
     try {
       const stored = localStorage.getItem('user');
@@ -144,17 +147,34 @@ export default function ClientView() {
 
       <div className="gold-divider"></div>
 
-      <form onSubmit={handleLogin} className="space-y-5">
-        <div>
-          <label className="label">Nombre Completo</label>
-          <input required type="text" className="input-dark" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} placeholder="Ej: Carlos Pérez" />
+      <div className="space-y-5">
+        <GoogleLoginButton onLogin={(data) => {
+          if (data.needsPhone) {
+            navigate('/complete-profile');
+          } else {
+            setUser(data);
+            setStep('booking');
+          }
+        }} />
+        
+        <div className="relative flex items-center">
+          <div className="flex-1 h-px" style={{ background: 'var(--border)' }}></div>
+          <span className="px-3 text-xs" style={{ color: 'var(--text-muted)' }}>O usa WhatsApp</span>
+          <div className="flex-1 h-px" style={{ background: 'var(--border)' }}></div>
         </div>
-        <div>
-          <label className="label">WhatsApp</label>
-          <input required type="tel" className="input-dark" value={formData.whatsapp} onChange={e => setFormData({...formData, whatsapp: e.target.value})} placeholder="Ej: 3001234567" />
-        </div>
-        <button type="submit" className="btn-gold">Recibir Código por WhatsApp</button>
-      </form>
+
+        <form onSubmit={handleLogin} className="space-y-5">
+          <div>
+            <label className="label">Nombre Completo</label>
+            <input required type="text" className="input-dark" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} placeholder="Ej: Carlos Pérez" />
+          </div>
+          <div>
+            <label className="label">WhatsApp</label>
+            <input required type="tel" className="input-dark" value={formData.whatsapp} onChange={e => setFormData({...formData, whatsapp: e.target.value})} placeholder="Ej: 3001234567" />
+          </div>
+          <button type="submit" className="btn-gold">Recibir Código por WhatsApp</button>
+        </form>
+      </div>
     </div>
   );
 

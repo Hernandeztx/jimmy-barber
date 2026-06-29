@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   getTurnos, avisarSiguiente, retrasarAgenda, 
   bloquearHorario, actualizarEstadoTurno, 
-  invitarAdelantar, loginBarber 
+  invitarAdelantar, loginBarber, googleLogin
 } from '../services/api';
 import PinPad from '../components/PinPad';
 import AdminView from './AdminView';

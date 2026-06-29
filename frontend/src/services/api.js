@@ -142,3 +142,54 @@ export const invitarAdelantar = async (barberoId, data) => {
   });
   return response.json();
 };
+
+// ── Auth Google + Profile Completion ──────────────────────────────────────────
+
+export const googleLogin = async (data) => {
+  const response = await fetch(`${BASE_URL}/auth/google-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return response.json();
+};
+
+export const completeUserProfile = async (data) => {
+  const response = await fetch(`${BASE_URL}/auth/complete-profile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return response.json();
+};
+
+// ── Staff Management ──────────────────────────────────────────────────────────
+
+export const inviteStaff = async (data) => {
+  const response = await fetch(`${BASE_URL}/staff/invite`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return response.json();
+};
+
+export const validateToken = async (token) => {
+  const response = await fetch(`${BASE_URL}/staff/validate-token/${token}`);
+  return response.json();
+};
+
+export const completeRegistration = async (data) => {
+  const response = await fetch(`${BASE_URL}/staff/complete-registration`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return response.json();
+};
+
+export const getStaffList = async () => {
+  const response = await fetch(`${BASE_URL}/staff`);
+  return response.json();
+};
+

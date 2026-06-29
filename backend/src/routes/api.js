@@ -5,11 +5,14 @@ const authController = require('../controllers/authController');
 const barberosController = require('../controllers/barberosController');
 const turnosController = require('../controllers/turnosController');
 const serviciosController = require('../controllers/serviciosController');
+const staffController = require('../controllers/staffController');
 
-// Auth Routes (Simulated)
+// Auth Routes
 router.post('/auth/request-otp', authController.requestOTP);
 router.post('/auth/verify-otp', authController.verifyOTP);
 router.post('/auth/login-barber', authController.loginBarber);
+router.post('/auth/google-login', authController.googleLogin);
+router.post('/auth/complete-profile', authController.completeProfile);
 
 // Barberos Routes
 router.get('/barberos', barberosController.getBarberos);
@@ -30,4 +33,11 @@ router.patch('/turnos/:turnoId', turnosController.actualizarEstadoTurno);
 router.delete('/turnos/:turnoId', turnosController.eliminarTurno);
 router.post('/barberos/:barberoId/invitar-adelantar', turnosController.invitarAdelantar);
 
+// Staff Management Routes
+router.post('/staff/invite', staffController.inviteStaff);
+router.get('/staff/validate-token/:token', staffController.validateToken);
+router.post('/staff/complete-registration', staffController.completeRegistration);
+router.get('/staff', staffController.getStaffList);
+
 module.exports = router;
+

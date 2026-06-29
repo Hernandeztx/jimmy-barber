@@ -18,8 +18,9 @@ async function initDb() {
         id SERIAL PRIMARY KEY,
         nombre VARCHAR(255) NOT NULL,
         email VARCHAR(255) UNIQUE,
-        whatsapp VARCHAR(50) UNIQUE NOT NULL,
-        verificado INTEGER DEFAULT 0 CHECK (verificado IN (0, 1))
+        whatsapp VARCHAR(50) UNIQUE,
+        verificado INTEGER DEFAULT 0 CHECK (verificado IN (0, 1)),
+        picture VARCHAR(500)
       );
 
       CREATE TABLE IF NOT EXISTS barberos (
@@ -27,7 +28,21 @@ async function initDb() {
         nombre VARCHAR(255) NOT NULL,
         rol VARCHAR(50) DEFAULT 'trabajador' CHECK (rol IN ('admin', 'trabajador')),
         estado VARCHAR(50) DEFAULT 'disponible' CHECK (estado IN ('disponible', 'en_descanso')),
-        pin VARCHAR(50) NOT NULL
+        pin VARCHAR(50) NOT NULL,
+        email VARCHAR(255),
+        whatsapp VARCHAR(50),
+        phone_number VARCHAR(50)
+      );
+
+      CREATE TABLE IF NOT EXISTS staff_invites (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        nombre VARCHAR(255),
+        barbero_id INTEGER REFERENCES barberos(id) ON DELETE SET NULL,
+        token VARCHAR(255) UNIQUE NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'expired')),
+        created_at TIMESTAMP DEFAULT NOW(),
+        expires_at TIMESTAMP DEFAULT (NOW() + INTERVAL '7 days')
       );
 
       CREATE TABLE IF NOT EXISTS turnos (

@@ -1,8 +1,26 @@
 const db = require('../config/db');
 const { enviarMensajeWhatsApp, generarOTP } = require('../services/whatsappService');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'barber-turn-secret-key';
 
 // In-memory store for OTPs
 const otpStore = {};
+
+// Verify JWT token
+function verifyToken(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Token requerido' });
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Token inválido' });
+  }
+}
 
 exports.requestOTP = async (req, res) => {
   const { nombre, email, whatsapp } = req.body;
@@ -69,8 +87,82 @@ exports.loginBarber = async (req, res) => {
       return res.status(401).json({ error: 'PIN incorrecto' });
     }
 
-    res.json({ message: 'Login exitoso', barbero });
+    const inviteCheck = await db.query(
+      'SELECT status FROM staff_invites WHERE barbero_id = $1',
+      [barbero.id]
+    );
+
+    if (inviteCheck.rows.length > 0 && inviteCheck.rows[0].status !== 'active') {
+      return res.status(403).json({ error: 'Tu cuenta aún no está activa. Completa el registro desde el enlace de invitación.' });
+    }
+
+    const token = jwt.sign(
+      { id: barbero.id, nombre: barbero.nombre, rol: barbero.rol, email: barbero.email },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({ message: 'Login exitoso', barbero, token });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
+
+exports.googleLogin = async (req, res) => {
+  const { email, nombre, picture } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email es requerido' });
+  }
+
+  try {
+    let user;
+    const selectRes = await db.query('SELECT * FROM usuarios WHERE email = $1', [email]);
+    user = selectRes.rows[0];
+
+    if (!user) {
+      const insertRes = await db.query(
+        'INSERT INTO usuarios (nombre, email, whatsapp, verificado, picture) VALUES ($1, $2, $3, 1, $4) RETURNING *',
+        [nombre, email, null, picture || null]
+      );
+      user = insertRes.rows[0];
+    }
+
+    const token = jwt.sign(
+      { id: user.id, nombre: user.nombre, email: user.email, whatsapp: user.whatsapp },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({ message: 'Login con Google exitoso', user, token, needsPhone: !user.whatsapp });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.completeProfile = async (req, res) => {
+  const { userId, phone_number } = req.body;
+  
+  if (!userId || !phone_number) {
+    return res.status(400).json({ error: 'userId y phone_number son requeridos' });
+  }
+
+  try {
+    const updateRes = await db.query(
+      'UPDATE usuarios SET whatsapp = $1 WHERE id = $2 RETURNING *',
+      [phone_number, userId]
+    );
+
+    const user = updateRes.rows[0];
+    const token = jwt.sign(
+      { id: user.id, nombre: user.nombre, email: user.email, whatsapp: user.whatsapp },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({ message: 'Perfil completado', user, token });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.verifyAuthToken = verifyToken;

@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { 
   getBarberos, getTurnos, getServicios, createServicio, 
   updateServicio, deleteServicio, bloquearHorario, 
-  actualizarEstadoTurno, eliminarTurno 
+  actualizarEstadoTurno, eliminarTurno, inviteStaff, getStaffList
 } from '../services/api';
 
 export default function AdminView({ onLogout }) {
-  const [activeTab, setActiveTab] = useState('agenda'); // agenda | servicios | metricas
+  const [activeTab, setActiveTab] = useState('agenda'); // agenda | servicios | metricas | staff
   const [barberos, setBarberos] = useState([]);
   const [selectedBarbero, setSelectedBarbero] = useState(null);
   const [turnos, setTurnos] = useState([]);
@@ -23,9 +23,13 @@ export default function AdminView({ onLogout }) {
   const [serviceForm, setServiceForm] = useState({ id: null, nombre: '', icono: '✂️', duracion_min: 45, precio: 15000 });
   const [isEditingService, setIsEditingService] = useState(false);
 
-  // Status message
-  const [status, setStatus] = useState('');
-  const [statusType, setStatusType] = useState('info'); // info | success | error
+// Status message
+const [status, setStatus] = useState('');
+const [statusType, setStatusType] = useState('info'); // info | success | error
+
+// Staff Management
+const [staff, setStaff] = useState([]);
+const [inviteForm, setInviteForm] = useState({ email: '', nombre: '' });
 
   useEffect(() => {
     cargarDatosIniciales();
@@ -51,9 +55,35 @@ export default function AdminView({ onLogout }) {
 
       const servs = await getServicios();
       setServicios(servs);
+
+      // Load staff list
+      const staffList = await getStaffList();
+      setStaff(staffList);
     } catch (err) {
       console.error(err);
       showStatus('Error al cargar datos', 'error');
+    }
+  };
+
+  const handleInviteStaff = async (e) => {
+    e.preventDefault();
+    if (!inviteForm.email.trim()) return showStatus('Email es requerido', 'error');
+    
+    try {
+      showStatus('Enviando invitación...');
+      const result = await inviteStaff(inviteForm);
+      
+      if (result.success) {
+        showStatus(`Invitación enviada a ${inviteForm.email}`, 'success');
+        setInviteForm({ email: '', nombre: '' });
+        
+        const staffList = await getStaffList();
+        setStaff(staffList);
+      } else {
+        showStatus(result.error || 'Error al enviar invitación', 'error');
+      }
+    } catch (err) {
+      showStatus('Error de conexión', 'error');
     }
   };
 
@@ -200,6 +230,12 @@ export default function AdminView({ onLogout }) {
             className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${activeTab === 'metricas' ? 'bg-[var(--gold)] text-[#0A0A0A]' : 'bg-white/5 text-white/70 hover:bg-white/10'}`}
           >
             📊 Métricas
+          </button>
+          <button 
+            onClick={() => setActiveTab('staff')} 
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${activeTab === 'staff' ? 'bg-[var(--gold)] text-[#0A0A0A]' : 'bg-white/5 text-white/70 hover:bg-white/10'}`}
+          >
+            👥 Staff
           </button>
         </div>
       </div>
@@ -498,9 +534,81 @@ export default function AdminView({ onLogout }) {
                 <span className="text-red-400 font-medium">{metrics.inasistencias}</span>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+</div>
+         </div>
+       )}
+
+       {/* Tab: Staff Management */}
+       {activeTab === 'staff' && (
+         <div className="space-y-5">
+           {/* Invite Form */}
+           <form onSubmit={handleInviteStaff} className="card space-y-4">
+             <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+               <span>✉️</span> Invitar Nuevo Trabajador
+             </h3>
+             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+               Ingresa el email del trabajador y se enviará una invitación automática con enlace de registro.
+             </p>
+             <div className="grid grid-cols-2 gap-4">
+               <div>
+                 <label className="label">Email</label>
+                 <input 
+                   required type="email" 
+                   className="input-dark" 
+                   value={inviteForm.email} 
+                   onChange={e => setInviteForm({...inviteForm, email: e.target.value})} 
+                   placeholder="trabajador@ejemplo.com" 
+                 />
+               </div>
+               <div>
+                 <label className="label">Nombre (opcional)</label>
+                 <input 
+                   type="text" 
+                   className="input-dark" 
+                   value={inviteForm.nombre} 
+                   onChange={e => setInviteForm({...inviteForm, nombre: e.target.value})} 
+                   placeholder="Ej: Carlos Rodríguez" 
+                 />
+               </div>
+             </div>
+             <button type="submit" className="btn-gold">Enviar Invitación</button>
+           </form>
+
+           {/* Staff List */}
+           <div className="space-y-3">
+             <label className="label px-1">Equipo de Trabajo ({staff.length})</label>
+             {staff.length === 0 ? (
+               <div className="card text-center py-12">
+                 <span className="text-4xl mb-3 block">👥</span>
+                 <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No hay staff registrado aún</p>
+               </div>
+             ) : (
+               <div className="grid grid-cols-1 gap-3">
+                 {staff.map(member => (
+                   <div key={member.id} className="card flex items-center justify-between">
+                     <div>
+                       <h4 className="font-bold text-white text-sm">
+                         {member.nombre_barbero || member.nombre || member.email}
+                       </h4>
+                       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{member.email}</p>
+                     </div>
+                     <div className="flex items-center gap-2">
+                       <span className={member.status === 'active' ? 'badge-green text-[10px]' : 'badge-gray text-[10px]'}>
+                         {member.status === 'active' ? '✓ Activo' : '○ Pendiente'}
+                       </span>
+                       {member.rol && (
+                         <span className="badge-gold text-[10px]">
+                           {member.rol === 'admin' ? '👑 Admin' : '✂️ Trabajador'}
+                         </span>
+                       )}
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             )}
+           </div>
+         </div>
+       )}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import ClientView from './pages/ClientView';
 import BarberView from './pages/BarberView';
+import RegisterPage from './pages/RegisterPage';
+import CompleteProfilePage from './pages/CompleteProfilePage';
 
 function NavLink({ to, children }) {
   const location = useLocation();
@@ -47,6 +49,8 @@ function AppContent() {
         <Routes>
           <Route path="/" element={<ClientView />} />
           <Route path="/barber" element={<BarberView />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/complete-profile" element={<CompleteProfilePage />} />
         </Routes>
       </main>
     </div>
