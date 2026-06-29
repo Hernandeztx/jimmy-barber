@@ -1,7 +1,10 @@
 const db = require('../config/db');
 
-exports.getBarberos = (req, res) => {
-  const stmt = db.prepare("SELECT * FROM barberos");
-  const barberos = stmt.all();
-  res.json(barberos);
+exports.getBarberos = async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM barberos');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };

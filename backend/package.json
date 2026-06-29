@@ -9,8 +9,10 @@
     "init-db": "node src/models/initDb.js"
   },
   "dependencies": {
+    "@zavudev/sdk": "^0.46.0",
     "cors": "^2.8.5",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "pg": "^8.22.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"

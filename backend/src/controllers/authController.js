@@ -1,7 +1,7 @@
 const db = require('../config/db');
 const { enviarMensajeWhatsApp, generarOTP } = require('../services/whatsappService');
 
-// In-memory store for OTPs (In a real app, use Redis or DB with expiration)
+// In-memory store for OTPs
 const otpStore = {};
 
 exports.requestOTP = async (req, res) => {
@@ -19,7 +19,7 @@ exports.requestOTP = async (req, res) => {
   res.json({ message: 'OTP generado y enviado por WhatsApp simulado' });
 };
 
-exports.verifyOTP = (req, res) => {
+exports.verifyOTP = async (req, res) => {
   const { nombre, email, whatsapp, otp } = req.body;
 
   if (otpStore[whatsapp] !== otp) {
@@ -29,33 +29,41 @@ exports.verifyOTP = (req, res) => {
   // Clear OTP
   delete otpStore[whatsapp];
 
-  // Insert or get user from DB
-  let user;
-  const selectStmt = db.prepare('SELECT * FROM usuarios WHERE whatsapp = ?');
-  user = selectStmt.get(whatsapp);
+  try {
+    // Insert or get user from DB
+    let user;
+    const selectRes = await db.query('SELECT * FROM usuarios WHERE whatsapp = $1', [whatsapp]);
+    user = selectRes.rows[0];
 
-  if (!user) {
-    const insertStmt = db.prepare('INSERT INTO usuarios (nombre, email, whatsapp, verificado) VALUES (?, ?, ?, 1)');
-    const info = insertStmt.run(nombre, email || null, whatsapp);
-    user = { id: info.lastInsertRowid, nombre, email, whatsapp, verificado: 1 };
-  } else if (!user.verificado) {
-    const updateStmt = db.prepare('UPDATE usuarios SET verificado = 1 WHERE whatsapp = ?');
-    updateStmt.run(whatsapp);
-    user.verificado = 1;
+    if (!user) {
+      const insertRes = await db.query(
+        'INSERT INTO usuarios (nombre, email, whatsapp, verificado) VALUES ($1, $2, $3, 1) RETURNING *',
+        [nombre, email || null, whatsapp]
+      );
+      user = insertRes.rows[0];
+    } else if (!user.verificado) {
+      const updateRes = await db.query(
+        'UPDATE usuarios SET verificado = 1 WHERE whatsapp = $1 RETURNING *',
+        [whatsapp]
+      );
+      user = updateRes.rows[0];
+    }
+
+    res.json({ message: 'Verificación exitosa', user });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  res.json({ message: 'Verificación exitosa', user });
 };
 
-exports.loginBarber = (req, res) => {
+exports.loginBarber = async (req, res) => {
   const { pin } = req.body;
   if (!pin) {
     return res.status(400).json({ error: 'PIN requerido' });
   }
 
   try {
-    const selectStmt = db.prepare('SELECT * FROM barberos WHERE pin = ?');
-    const barbero = selectStmt.get(pin);
+    const selectRes = await db.query('SELECT * FROM barberos WHERE pin = $1', [pin]);
+    const barbero = selectRes.rows[0];
 
     if (!barbero) {
       return res.status(401).json({ error: 'PIN incorrecto' });

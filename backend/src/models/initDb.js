@@ -1,98 +1,109 @@
-const { DatabaseSync } = require('node:sqlite');
-const path = require('path');
+const db = require('../config/db');
 
-const dbPath = path.join(__dirname, '../../database.sqlite');
+async function initDb() {
+  console.log('Initializing Supabase PostgreSQL database...');
 
-const db = new DatabaseSync(dbPath);
+  try {
+    // Create tables first
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS servicios (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(255) NOT NULL,
+        icono VARCHAR(50) NOT NULL,
+        duracion_min INTEGER DEFAULT 45,
+        precio NUMERIC(12, 2) NOT NULL
+      );
 
-console.log('Initializing SQLite database...');
+      CREATE TABLE IF NOT EXISTS usuarios (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE,
+        whatsapp VARCHAR(50) UNIQUE NOT NULL,
+        verificado INTEGER DEFAULT 0 CHECK (verificado IN (0, 1))
+      );
 
-// Drop existing tables to start fresh with new schema in development
-db.exec(`
-  DROP TABLE IF EXISTS turnos;
-  DROP TABLE IF EXISTS usuarios;
-  DROP TABLE IF EXISTS barberos;
-  DROP TABLE IF EXISTS servicios;
-`);
+      CREATE TABLE IF NOT EXISTS barberos (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(255) NOT NULL,
+        rol VARCHAR(50) DEFAULT 'trabajador' CHECK (rol IN ('admin', 'trabajador')),
+        estado VARCHAR(50) DEFAULT 'disponible' CHECK (estado IN ('disponible', 'en_descanso')),
+        pin VARCHAR(50) NOT NULL
+      );
 
-const initScript = `
-  CREATE TABLE IF NOT EXISTS servicios (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT NOT NULL,
-    icono TEXT NOT NULL,
-    duracion_min INTEGER DEFAULT 45,
-    precio REAL NOT NULL
-  );
+      CREATE TABLE IF NOT EXISTS turnos (
+        id SERIAL PRIMARY KEY,
+        barbero_id INTEGER NOT NULL REFERENCES barberos(id) ON DELETE CASCADE,
+        usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+        servicio_id INTEGER REFERENCES servicios(id) ON DELETE SET NULL,
+        hora_inicio TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+        hora_fin TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+        preferencia VARCHAR(50) DEFAULT 'hora_fija' CHECK (preferencia IN ('hora_fija', 'puedo_adelantar')),
+        estado_turno VARCHAR(50) DEFAULT 'pendiente' CHECK (estado_turno IN ('pendiente', 'asistio', 'no_asistio', 'reprogramado', 'bloqueado'))
+      );
+    `);
 
-  CREATE TABLE IF NOT EXISTS usuarios (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT NOT NULL,
-    email TEXT UNIQUE,
-    whatsapp TEXT UNIQUE NOT NULL,
-    verificado INTEGER DEFAULT 0 CHECK (verificado IN (0, 1))
-  );
+    // Drop trigger if exists to redefine it cleanly
+    await db.query(`DROP TRIGGER IF EXISTS trg_max_1_pending_per_day ON turnos;`);
+    await db.query(`DROP FUNCTION IF EXISTS check_max_1_pending_per_day;`);
 
-  CREATE TABLE IF NOT EXISTS barberos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT NOT NULL,
-    rol TEXT DEFAULT 'trabajador' CHECK (rol IN ('admin', 'trabajador')),
-    estado TEXT DEFAULT 'disponible' CHECK (estado IN ('disponible', 'en_descanso')),
-    pin TEXT NOT NULL
-  );
+    // Create Trigger Function
+    await db.query(`
+      CREATE OR REPLACE FUNCTION check_max_1_pending_per_day()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        IF NEW.estado_turno = 'pendiente' AND EXISTS (
+          SELECT 1 FROM turnos
+          WHERE usuario_id = NEW.usuario_id
+            AND estado_turno = 'pendiente'
+            AND hora_inicio::date = NEW.hora_inicio::date
+        ) THEN
+          RAISE EXCEPTION 'El usuario ya tiene un turno pendiente para este dia.';
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
 
-  CREATE TABLE IF NOT EXISTS turnos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    barbero_id INTEGER NOT NULL,
-    usuario_id INTEGER, -- Nullable for blocked times
-    servicio_id INTEGER, -- Nullable for blocked times
-    hora_inicio TEXT NOT NULL, -- Format: YYYY-MM-DD HH:MM
-    hora_fin TEXT NOT NULL,    -- Format: YYYY-MM-DD HH:MM
-    preferencia TEXT DEFAULT 'hora_fija' CHECK (preferencia IN ('hora_fija', 'puedo_adelantar')),
-    estado_turno TEXT DEFAULT 'pendiente' CHECK (estado_turno IN ('pendiente', 'asistio', 'no_asistio', 'reprogramado', 'bloqueado')),
-    FOREIGN KEY (barbero_id) REFERENCES barberos(id),
-    FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
-    FOREIGN KEY (servicio_id) REFERENCES servicios(id)
-  );
+    // Create Trigger
+    await db.query(`
+      CREATE TRIGGER trg_max_1_pending_per_day
+      BEFORE INSERT ON turnos
+      FOR EACH ROW
+      EXECUTE FUNCTION check_max_1_pending_per_day();
+    `);
 
-  -- Trigger to enforce max 1 pending appointment per day per user
-  CREATE TRIGGER IF NOT EXISTS trg_max_1_pending_per_day
-  BEFORE INSERT ON turnos
-  FOR EACH ROW
-  WHEN NEW.estado_turno = 'pendiente'
-  BEGIN
-    SELECT RAISE(ABORT, 'El usuario ya tiene un turno pendiente para este dia.')
-    WHERE EXISTS (
-      SELECT 1 FROM turnos
-      WHERE usuario_id = NEW.usuario_id
-        AND estado_turno = 'pendiente'
-        AND date(hora_inicio) = date(NEW.hora_inicio)
-    );
-  END;
-`;
+    console.log('Tables and triggers verified.');
 
-db.exec(initScript);
+    // Seed Services if empty
+    const sCount = await db.query('SELECT count(*) FROM servicios');
+    if (parseInt(sCount.rows[0].count) === 0) {
+      console.log('Seeding services...');
+      await db.query(`
+        INSERT INTO servicios (nombre, icono, duracion_min, precio) VALUES
+        ('Corte Clásico', '✂️', 45, 15000),
+        ('Fade / Degradado', '💈', 45, 18000),
+        ('Corte y Barba', '🧔', 45, 25000);
+      `);
+    }
 
-// Seed initial services
-const stmtServiciosCount = db.prepare('SELECT count(*) as count FROM servicios');
-const resServicios = stmtServiciosCount.get();
-if (resServicios.count === 0) {
-  console.log('Seeding initial services...');
-  const insertServicio = db.prepare('INSERT INTO servicios (nombre, icono, duracion_min, precio) VALUES (?, ?, ?, ?)');
-  insertServicio.run('Corte Clásico', '✂️', 45, 15000);
-  insertServicio.run('Fade / Degradado', '💈', 45, 18000);
-  insertServicio.run('Corte y Barba', '🧔', 45, 25000);
+    // Seed Barbers if empty
+    const bCount = await db.query('SELECT count(*) FROM barberos');
+    if (parseInt(bCount.rows[0].count) === 0) {
+      console.log('Seeding barbers...');
+      await db.query(`
+        INSERT INTO barberos (nombre, rol, pin) VALUES
+        ('Jimmy (Admin)', 'admin', '1234'),
+        ('Pedro', 'trabajador', '5555'),
+        ('Carlos', 'trabajador', '7777');
+      `);
+    }
+
+    console.log('Database initialized successfully on Supabase.');
+  } catch (err) {
+    console.error('Error during database initialization:', err);
+  } finally {
+    db.pool.end();
+  }
 }
 
-// Seed initial barbers
-const stmtBarberosCount = db.prepare('SELECT count(*) as count FROM barberos');
-const resBarberos = stmtBarberosCount.get();
-if (resBarberos.count === 0) {
-  console.log('Seeding initial barbers...');
-  const insertBarbero = db.prepare('INSERT INTO barberos (nombre, rol, pin) VALUES (?, ?, ?)');
-  insertBarbero.run('Jimmy (Admin)', 'admin', '1234');
-  insertBarbero.run('Pedro', 'trabajador', '5555');
-  insertBarbero.run('Carlos', 'trabajador', '7777');
-}
-
-console.log('Database initialized successfully at', dbPath);
-db.close();
+initDb();

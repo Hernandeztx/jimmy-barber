@@ -1,25 +1,46 @@
-/**
- * Servicio Simulado de WhatsApp
- * Este módulo sirve como "mock" para imprimir en consola los mensajes que se enviarían por WhatsApp.
- * En el futuro, se puede integrar aquí la lógica para Evolution API o Baileys.
- */
+const Zavu = require('@zavudev/sdk').default || require('@zavudev/sdk');
 
-function enviarMensajeWhatsApp(numero, texto) {
-  // Asegurarse de que tenga el código de país (asumiendo Colombia +57 si tiene 10 dígitos)
-  let numDestino = numero;
-  if (numDestino.length === 10) numDestino = '57' + numDestino;
+// Default API Key provided by user (will use process.env.ZAVU_API_KEY if defined in production)
+const apiKey = process.env.ZAVU_API_KEY || 'zv_test_9f1c64462d87c68c76a1f4bd1fb7e95f7491fd9788fba732';
+
+let zavu = null;
+try {
+  zavu = new Zavu({ apiKey });
+} catch (err) {
+  console.error('Error al inicializar Zavu SDK:', err);
+}
+
+async function enviarMensajeWhatsApp(numero, texto) {
+  // Asegurarse de que tenga el formato de número correcto (+57... para Colombia)
+  let numDestino = numero.trim().replace(/[^\d+]/g, '');
+  if (!numDestino.startsWith('+')) {
+    if (numDestino.startsWith('57')) {
+      numDestino = '+' + numDestino;
+    } else if (numDestino.length === 10) {
+      numDestino = '+57' + numDestino;
+    } else {
+      numDestino = '+' + numDestino;
+    }
+  }
 
   const timestamp = new Date().toISOString();
   console.log(`\n======================================================`);
-  console.log(`[SIMULACIÓN WA] - ${timestamp}`);
+  console.log(`[ENVÍO WHATSAPP ZAVU] - ${timestamp}`);
   console.log(`DESTINATARIO : ${numDestino}`);
   console.log(`MENSAJE      :\n${texto}`);
   console.log(`======================================================\n`);
-  
-  // Aquí es donde harías un fetch a la Evolution API en el futuro
-  // return fetch('http://localhost:8080/message/sendText', { ... });
-  
-  return Promise.resolve({ success: true, message: 'Mensaje simulado enviado' });
+
+  if (zavu) {
+    try {
+      await zavu.messages.send({ to: numDestino, text: texto });
+      return { success: true, message: 'Mensaje enviado con éxito vía Zavu' };
+    } catch (err) {
+      console.error('Error al enviar mensaje a través de Zavu:', err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  return { success: true, message: 'Zavu no inicializado, mensaje simulado' };
 }
 
 function generarOTP() {

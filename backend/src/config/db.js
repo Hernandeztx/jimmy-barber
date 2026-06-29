@@ -1,7 +1,15 @@
-const { DatabaseSync } = require('node:sqlite');
-const path = require('path');
+const { Pool } = require('pg');
 
-const dbPath = path.join(__dirname, '../../database.sqlite');
-const db = new DatabaseSync(dbPath);
+const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:migueldevia50.@db.hndgnqhzaqkdrjwygtmp.supabase.co:5432/postgres';
 
-module.exports = db;
+const pool = new Pool({
+  connectionString,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
+
+module.exports = {
+  query: (text, params) => pool.query(text, params),
+  pool
+};
