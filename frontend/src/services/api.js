@@ -1,4 +1,7 @@
 const getBaseUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
   const hostname = window.location.hostname;
   return `http://${hostname}:3000/api`;
 };
