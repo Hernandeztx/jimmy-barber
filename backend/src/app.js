@@ -14,6 +14,8 @@ app.use(express.json());
 
 // Routes
 const apiRoutes = require('./routes/api');
+const barberosController = require('./controllers/barberosController');
+const serviciosController = require('./controllers/serviciosController');
 app.use('/api', apiRoutes);
 
 // OAuth routes (outside /api for Google redirects)
@@ -21,7 +23,9 @@ const authController = require('./controllers/authController');
 app.get('/auth/google', authController.googleAuth);
 app.get('/auth/google/callback', authController.googleAuthCallback);
 
-// Allow auth/complete-profile without /api prefix for frontend compatibility
+// Allow routes without /api prefix for frontend compatibility
+app.get('/barberos', barberosController.getBarberos);
+app.get('/servicios', serviciosController.getServicios);
 app.post('/auth/complete-profile', authController.completeProfile);
 
 // Configure port and listen on all interfaces (0.0.0.0) for local network access
