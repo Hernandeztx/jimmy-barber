@@ -107,13 +107,11 @@ async function initDb() {
     const bCount = await db.query('SELECT count(*) FROM barberos');
     if (parseInt(bCount.rows[0].count) === 0) {
       console.log('Seeding barbers...');
-      const bcrypt = require('bcrypt');
-      const hashedPassword = await bcrypt.hash('password123', 10);
       await db.query(`
-        INSERT INTO barberos (nombre, rol, pin, email, password) VALUES
-        ('Jimmy (Admin)', 'admin', '1234', 'jimmy@barber.com', '${hashedPassword}'),
-        ('Pedro', 'trabajador', '5555', 'pedro@barber.com', '${hashedPassword}'),
-        ('Carlos', 'trabajador', '7777', 'carlos@barber.com', '${hashedPassword}');
+        INSERT INTO barberos (nombre, rol, pin, email) VALUES
+        ('Jimmy (Admin)', 'admin', '1234', 'jimmy@barber.com'),
+        ('Pedro', 'trabajador', '5555', 'pedro@barber.com'),
+        ('Carlos', 'trabajador', '7777', 'carlos@barber.com');
       `);
     }
 

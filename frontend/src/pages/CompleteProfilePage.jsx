@@ -11,24 +11,31 @@ export default function CompleteProfilePage() {
   const [phone, setPhone] = useState('');
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
     const urlParams = new URLSearchParams(location.search);
     const token = urlParams.get('token');
-    
-    if (!storedUser && !token) {
-      navigate('/');
-      return;
+    const needsPhone = urlParams.get('needsPhone') === 'true';
+    const userParam = urlParams.get('user');
+
+    if (token) {
+      localStorage.setItem('token', token);
     }
-    
-    if (storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      if (parsedUser.whatsapp) {
-        navigate('/');
-        return;
+
+    if (userParam) {
+      try {
+        const parsedUser = JSON.parse(decodeURIComponent(userParam));
+        setUser(parsedUser);
+      } catch (e) {
+        console.error('Error parsing user:', e);
       }
-      setUser(parsedUser);
+    } else {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      } else {
+        navigate('/');
+      }
     }
-  }, [navigate, location]);
+  }, [location, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,17 +45,13 @@ export default function CompleteProfilePage() {
     setError('');
     
     try {
-      let result;
       if (user) {
-        result = await completeUserProfile({ userId: user.id, phone_number: phone });
-      }
-      
-      if (result && result.token) {
-        localStorage.setItem('user', JSON.stringify(result.user));
-        localStorage.setItem('token', result.token);
-        navigate('/');
-      } else {
-        setError('Error al completar el perfil');
+        const result = await completeUserProfile({ userId: user.id, phone_number: phone });
+        if (result.token) {
+          localStorage.setItem('user', JSON.stringify(result.user));
+          localStorage.setItem('token', result.token);
+          navigate('/');
+        }
       }
     } catch (err) {
       setError('Error de conexión. Intenta de nuevo.');

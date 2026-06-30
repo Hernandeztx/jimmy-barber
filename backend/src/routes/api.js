@@ -14,6 +14,8 @@ router.post('/auth/request-otp', authController.requestOTP);
 router.post('/auth/verify-otp', authController.verifyOTP);
 router.post('/auth/login-barber', authController.loginBarber);
 router.post('/auth/complete-profile', authController.completeProfile);
+router.get('/auth/google', authController.googleAuth);
+router.get('/auth/google/callback', authController.googleAuthCallback);
 
 // Barberos Routes
 router.get('/barberos', barberosController.getBarberos);

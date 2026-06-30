@@ -5,9 +5,9 @@ const bcrypt = require('bcrypt');
 const { OAuth2Client } = require('google-auth-library');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'barber-turn-secret-key';
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '997428200374-lp0j7d70qohh8g9c98hj7n5n5q8j3g7m.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 
-const client = new OAuth2Client(GOOGLE_CLIENT_ID);
+const client = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 
 function verifyToken(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -246,6 +246,61 @@ exports.completeProfile = async (req, res) => {
     res.json({ message: 'Perfil completado', user, token });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+};
+
+exports.googleAuth = async (req, res) => {
+  const redirectUri = `${process.env.BACKEND_URL || 'https://produccion-jimmybackend.kc7r3m.easypanel.host'}/api/auth/google/callback`;
+  const authUrl = client.generateAuthUrl({
+    access_type: 'offline',
+    scope: ['openid', 'email', 'profile'],
+    redirect_uri: redirectUri
+  });
+  res.redirect(authUrl);
+};
+
+exports.googleAuthCallback = async (req, res) => {
+  try {
+    const redirectUri = `${process.env.BACKEND_URL || 'https://produccion-jimmybackend.kc7r3m.easypanel.host'}/api/auth/google/callback`;
+    const { tokens } = await client.getToken({
+      code: req.query.code,
+      redirect_uri: redirectUri
+    });
+
+    client.setCredentials(tokens);
+
+    const ticket = await client.verifyIdToken({
+      idToken: tokens.id_token,
+      audience: GOOGLE_CLIENT_ID
+    });
+
+    const payload = ticket.getPayload();
+    const { email, name, picture } = payload;
+
+    let user;
+    const selectRes = await db.query('SELECT * FROM usuarios WHERE email = $1', [email]);
+    user = selectRes.rows[0];
+
+    if (!user) {
+      const insertRes = await db.query(
+        'INSERT INTO usuarios (nombre, email, whatsapp, verificado, picture) VALUES ($1, $2, $3, 1, $4) RETURNING *',
+        [name, email, null, picture || null]
+      );
+      user = insertRes.rows[0];
+    }
+
+    const token = jwt.sign(
+      { id: user.id, nombre: user.nombre, email: user.email, whatsapp: user.whatsapp, isStaff: false },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    const frontendUrl = process.env.FRONTEND_URL || 'https://produccion-jimmyfrontend.kc7r3m.easypanel.host';
+    const needsPhone = !user.whatsapp;
+    res.redirect(`${frontendUrl}/complete-profile?token=${token}&needsPhone=${needsPhone}&user=${encodeURIComponent(JSON.stringify(user))}`);
+  } catch (err) {
+    console.error('Google callback error:', err);
+    res.redirect(`${process.env.FRONTEND_URL || 'https://produccion-jimmyfrontend.kc7r3m.easypanel.host'}/?error=google_auth_failed`);
   }
 };
 

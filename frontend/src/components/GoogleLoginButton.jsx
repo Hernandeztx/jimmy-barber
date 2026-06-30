@@ -6,26 +6,7 @@ export default function GoogleLoginButton({ onLogin }) {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
-    
-    try {
-      // Para demo: usa login demo si no hay OAuth configurado
-      const demoEmail = `cliente${Date.now()}@gmail.com`;
-      const demoName = `Cliente ${Math.floor(1000 + Math.random() * 9000)}`;
-      
-      const result = await googleLogin({ email: demoEmail, nombre: demoName });
-      
-      if (result.needsPhone) {
-        localStorage.setItem('user', JSON.stringify(result.user));
-        onLogin({ ...result.user, needsPhone: true });
-      } else {
-        localStorage.setItem('user', JSON.stringify(result.user));
-        onLogin(result.user);
-      }
-    } catch (err) {
-      console.error('Login error:', err);
-    } finally {
-      setLoading(false);
-    }
+    window.location.href = '/api/auth/google';
   };
 
   return (
