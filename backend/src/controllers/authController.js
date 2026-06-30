@@ -250,7 +250,7 @@ exports.completeProfile = async (req, res) => {
 };
 
 exports.googleAuth = async (req, res) => {
-  const redirectUri = `${process.env.BACKEND_URL || 'https://api-jimmy.kc7r3m.easypanel.host'}/api/auth/google/callback`;
+  const redirectUri = `${process.env.BACKEND_URL || 'https://api-jimmy.kc7r3m.easypanel.host'}/auth/google/callback`;
   const authUrl = client.generateAuthUrl({
     access_type: 'offline',
     scope: ['openid', 'email', 'profile'],
@@ -262,7 +262,7 @@ exports.googleAuth = async (req, res) => {
 
 exports.googleAuthCallback = async (req, res) => {
   try {
-    const redirectUri = `${process.env.BACKEND_URL || 'https://api-jimmy.kc7r3m.easypanel.host'}/api/auth/google/callback`;
+    const redirectUri = `${process.env.BACKEND_URL || 'https://api-jimmy.kc7r3m.easypanel.host'}/auth/google/callback`;
     const { tokens } = await client.getToken({
       code: req.query.code,
       redirect_uri: redirectUri
@@ -302,7 +302,8 @@ exports.googleAuthCallback = async (req, res) => {
     res.redirect(`${frontendUrl}/complete-profile?token=${token}&needsPhone=${needsPhone}&user=${encodeURIComponent(JSON.stringify(user))}`);
   } catch (err) {
     console.error('Google callback error:', err);
-    res.redirect(`${process.env.FRONTEND_URL || 'https://produccion-jimmyfrontend.kc7r3m.easypanel.host'}/?error=google_auth_failed`);
+    const frontendUrl = process.env.FRONTEND_URL || 'https://produccion-jimmyfrontend.kc7r3m.easypanel.host';
+    res.redirect(`${frontendUrl}/?error=google_auth_failed`);
   }
 };
 
