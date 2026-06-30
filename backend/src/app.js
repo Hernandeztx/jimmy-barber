@@ -21,6 +21,9 @@ const authController = require('./controllers/authController');
 app.get('/auth/google', authController.googleAuth);
 app.get('/auth/google/callback', authController.googleAuthCallback);
 
+// Allow auth/complete-profile without /api prefix for frontend compatibility
+app.post('/auth/complete-profile', authController.completeProfile);
+
 // Configure port and listen on all interfaces (0.0.0.0) for local network access
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0';
