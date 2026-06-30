@@ -1,19 +1,25 @@
 const express = require('express');
 const cors = require('cors');
 
-// Fix: node:sqlite returns INTEGER as BigInt, but JSON.stringify can't serialize BigInt.
-// This global patch makes BigInts serialize as Numbers in JSON responses.
-BigInt.prototype.toJSON = function() { return Number(this); };
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://produccion-jimmyfrontend.kc7r3m.easypanel.host';
 
 const app = express();
 
 // Middlewares
-app.use(cors());
+app.use(cors({
+  origin: FRONTEND_URL,
+  credentials: true
+}));
 app.use(express.json());
 
 // Routes
 const apiRoutes = require('./routes/api');
 app.use('/api', apiRoutes);
+
+// OAuth routes (outside /api for Google redirects)
+const authController = require('./controllers/authController');
+app.get('/auth/google', authController.googleAuth);
+app.get('/auth/google/callback', authController.googleAuthCallback);
 
 // Configure port and listen on all interfaces (0.0.0.0) for local network access
 const PORT = process.env.PORT || 3000;

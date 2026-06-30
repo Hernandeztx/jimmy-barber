@@ -250,18 +250,19 @@ exports.completeProfile = async (req, res) => {
 };
 
 exports.googleAuth = async (req, res) => {
-  const redirectUri = `${process.env.BACKEND_URL || 'https://produccion-jimmybackend.kc7r3m.easypanel.host'}/api/auth/google/callback`;
+  const redirectUri = `${process.env.BACKEND_URL || 'https://api-jimmy.kc7r3m.easypanel.host'}/api/auth/google/callback`;
   const authUrl = client.generateAuthUrl({
     access_type: 'offline',
     scope: ['openid', 'email', 'profile'],
     redirect_uri: redirectUri
   });
+  console.log('Google auth redirect URI:', redirectUri);
   res.redirect(authUrl);
 };
 
 exports.googleAuthCallback = async (req, res) => {
   try {
-    const redirectUri = `${process.env.BACKEND_URL || 'https://produccion-jimmybackend.kc7r3m.easypanel.host'}/api/auth/google/callback`;
+    const redirectUri = `${process.env.BACKEND_URL || 'https://api-jimmy.kc7r3m.easypanel.host'}/api/auth/google/callback`;
     const { tokens } = await client.getToken({
       code: req.query.code,
       redirect_uri: redirectUri
@@ -297,6 +298,7 @@ exports.googleAuthCallback = async (req, res) => {
 
     const frontendUrl = process.env.FRONTEND_URL || 'https://produccion-jimmyfrontend.kc7r3m.easypanel.host';
     const needsPhone = !user.whatsapp;
+    console.log('Google callback - User:', email, 'Token generated, redirecting to:', frontendUrl);
     res.redirect(`${frontendUrl}/complete-profile?token=${token}&needsPhone=${needsPhone}&user=${encodeURIComponent(JSON.stringify(user))}`);
   } catch (err) {
     console.error('Google callback error:', err);
