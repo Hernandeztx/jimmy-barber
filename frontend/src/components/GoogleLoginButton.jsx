@@ -7,7 +7,7 @@ export default function GoogleLoginButton({ onLogin }) {
 
   const handleGoogleLogin = () => {
     setLoading(true);
-    window.location.href = `${API_URL}/api/auth/google`;
+    window.location.href = `${API_URL}/auth/google`;
   };
 
   return (
