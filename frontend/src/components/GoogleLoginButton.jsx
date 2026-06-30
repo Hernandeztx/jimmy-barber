@@ -7,20 +7,22 @@ export default function GoogleLoginButton({ onLogin }) {
   const handleGoogleLogin = async () => {
     setLoading(true);
     
-    const randomEmail = `user${Math.floor(1000 + Math.random() * 9000)}@gmail.com`;
-    const randomName = `Usuario ${Math.floor(1000 + Math.random() * 9000)}`;
-    
     try {
-      const result = await googleLogin({ email: randomEmail, nombre: randomName });
+      // Para demo: usa login demo si no hay OAuth configurado
+      const demoEmail = `cliente${Date.now()}@gmail.com`;
+      const demoName = `Cliente ${Math.floor(1000 + Math.random() * 9000)}`;
+      
+      const result = await googleLogin({ email: demoEmail, nombre: demoName });
       
       if (result.needsPhone) {
         localStorage.setItem('user', JSON.stringify(result.user));
         onLogin({ ...result.user, needsPhone: true });
       } else {
         localStorage.setItem('user', JSON.stringify(result.user));
+        onLogin(result.user);
       }
     } catch (err) {
-      console.error('Google login error:', err);
+      console.error('Login error:', err);
     } finally {
       setLoading(false);
     }
@@ -36,8 +38,8 @@ export default function GoogleLoginButton({ onLogin }) {
         <span className="w-5 h-5 border-2 border-gray-600 border-t-transparent rounded-full animate-spin"/>
       ) : (
         <>
-          <span className="text-lg">🔵</span>
-          Iniciar con Google (Demo)
+          <span className="text-lg font-bold">G</span>
+          <span className="text-blue-500 font-bold">Iniciar con Google</span>
         </>
       )}
     </button>

@@ -28,10 +28,12 @@ async function initDb() {
         nombre VARCHAR(255) NOT NULL,
         rol VARCHAR(50) DEFAULT 'trabajador' CHECK (rol IN ('admin', 'trabajador')),
         estado VARCHAR(50) DEFAULT 'disponible' CHECK (estado IN ('disponible', 'en_descanso')),
-        pin VARCHAR(50) NOT NULL,
-        email VARCHAR(255),
+        pin VARCHAR(50),
+        email VARCHAR(255) UNIQUE,
         whatsapp VARCHAR(50),
-        phone_number VARCHAR(50)
+        phone_number VARCHAR(50),
+        password VARCHAR(255),
+        google_id VARCHAR(255)
       );
 
       CREATE TABLE IF NOT EXISTS staff_invites (
@@ -105,11 +107,13 @@ async function initDb() {
     const bCount = await db.query('SELECT count(*) FROM barberos');
     if (parseInt(bCount.rows[0].count) === 0) {
       console.log('Seeding barbers...');
+      const bcrypt = require('bcrypt');
+      const hashedPassword = await bcrypt.hash('password123', 10);
       await db.query(`
-        INSERT INTO barberos (nombre, rol, pin) VALUES
-        ('Jimmy (Admin)', 'admin', '1234'),
-        ('Pedro', 'trabajador', '5555'),
-        ('Carlos', 'trabajador', '7777');
+        INSERT INTO barberos (nombre, rol, pin, email, password) VALUES
+        ('Jimmy (Admin)', 'admin', '1234', 'jimmy@barber.com', '${hashedPassword}'),
+        ('Pedro', 'trabajador', '5555', 'pedro@barber.com', '${hashedPassword}'),
+        ('Carlos', 'trabajador', '7777', 'carlos@barber.com', '${hashedPassword}');
       `);
     }
 

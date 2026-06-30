@@ -8,10 +8,11 @@ const serviciosController = require('../controllers/serviciosController');
 const staffController = require('../controllers/staffController');
 
 // Auth Routes
+router.post('/auth/google-login', authController.googleLogin);
+router.post('/auth/staff-login', authController.staffLogin);
 router.post('/auth/request-otp', authController.requestOTP);
 router.post('/auth/verify-otp', authController.verifyOTP);
 router.post('/auth/login-barber', authController.loginBarber);
-router.post('/auth/google-login', authController.googleLogin);
 router.post('/auth/complete-profile', authController.completeProfile);
 
 // Barberos Routes

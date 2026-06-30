@@ -31,7 +31,20 @@ export const verifyOTP = async (data) => {
   return res;
 };
 
-export const loginBarber = async (pin) => {
+export const loginBarber = async (credentials) => {
+  const { email, password } = typeof credentials === 'object' ? credentials : {};
+  const response = await fetch(`${BASE_URL}/auth/staff-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  });
+  const res = await response.json();
+  if (!response.ok) throw new Error(res.error || 'Error al iniciar sesión');
+  if (res.token) localStorage.setItem('token', res.token);
+  return res;
+};
+
+export const loginBarberByPin = async (pin) => {
   const response = await fetch(`${BASE_URL}/auth/login-barber`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -39,6 +52,7 @@ export const loginBarber = async (pin) => {
   });
   const res = await response.json();
   if (!response.ok) throw new Error(res.error || 'Error al iniciar sesión');
+  if (res.token) localStorage.setItem('token', res.token);
   return res;
 };
 

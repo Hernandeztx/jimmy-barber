@@ -1,13 +1,14 @@
 const db = require('../config/db');
 const { enviarMensajeWhatsApp, generarOTP } = require('../services/whatsappService');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
+const { OAuth2Client } = require('google-auth-library');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'barber-turn-secret-key';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '997428200374-lp0j7d70qohh8g9c98hj7n5n5q8j3g7m.apps.googleusercontent.com';
 
-// In-memory store for OTPs
-const otpStore = {};
+const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
-// Verify JWT token
 function verifyToken(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ error: 'Token requerido' });
@@ -21,6 +22,122 @@ function verifyToken(req, res, next) {
     return res.status(401).json({ error: 'Token inválido' });
   }
 }
+
+exports.googleLogin = async (req, res) => {
+  const { id_token, email, nombre, picture } = req.body;
+  
+  // Demo mode: si no hay id_token, usar email/nombre
+  if (!id_token) {
+    try {
+      if (!email) return res.status(400).json({ error: 'Email es requerido' });
+      
+      let user;
+      const selectRes = await db.query('SELECT * FROM usuarios WHERE email = $1', [email]);
+      user = selectRes.rows[0];
+
+      if (!user) {
+        const insertRes = await db.query(
+          'INSERT INTO usuarios (nombre, email, whatsapp, verificado, picture) VALUES ($1, $2, $3, 1, $4) RETURNING *',
+          [nombre, email, null, picture || null]
+        );
+        user = insertRes.rows[0];
+      }
+
+      const token = jwt.sign(
+        { id: user.id, nombre: user.nombre, email: user.email, whatsapp: user.whatsapp, isStaff: false },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      return res.json({ message: 'Login con Google exitoso', user, token, needsPhone: !user.whatsapp });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  // OAuth real con id_token
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken: id_token,
+      audience: GOOGLE_CLIENT_ID
+    });
+    
+    const payload = ticket.getPayload();
+    const { email, name, picture } = payload;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email no disponible en el token de Google' });
+    }
+
+    let user;
+    const selectRes = await db.query('SELECT * FROM usuarios WHERE email = $1', [email]);
+    user = selectRes.rows[0];
+
+    if (!user) {
+      const insertRes = await db.query(
+        'INSERT INTO usuarios (nombre, email, whatsapp, verificado, picture) VALUES ($1, $2, $3, 1, $4) RETURNING *',
+        [name, email, null, picture || null]
+      );
+      user = insertRes.rows[0];
+    }
+
+    const token = jwt.sign(
+      { id: user.id, nombre: user.nombre, email: user.email, whatsapp: user.whatsapp, isStaff: false },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({ message: 'Login con Google exitoso', user, token, needsPhone: !user.whatsapp });
+  } catch (err) {
+    console.error('Google auth error:', err);
+    res.status(401).json({ error: 'Token de Google inválido' });
+  }
+};
+
+exports.staffLogin = async (req, res) => {
+  const { email, password } = req.body;
+  
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email y contraseña requeridos' });
+  }
+
+  try {
+    const selectRes = await db.query('SELECT * FROM barberos WHERE email = $1', [email]);
+    const barbero = selectRes.rows[0];
+
+    if (!barbero) {
+      return res.status(401).json({ error: 'Credenciales incorrectas' });
+    }
+
+    const inviteCheck = await db.query(
+      'SELECT status FROM staff_invites WHERE barbero_id = $1',
+      [barbero.id]
+    );
+
+    if (inviteCheck.rows.length > 0 && inviteCheck.rows[0].status !== 'active') {
+      return res.status(403).json({ error: 'Tu cuenta aún no está activa. Completa el registro desde el enlace de invitación.' });
+    }
+
+    if (barbero.password) {
+      const validPassword = await bcrypt.compare(password, barbero.password);
+      if (!validPassword) {
+        return res.status(401).json({ error: 'Credenciales incorrectas' });
+      }
+    } else {
+      return res.status(401).json({ error: 'Credenciales incorrectas' });
+    }
+
+    const token = jwt.sign(
+      { id: barbero.id, nombre: barbero.nombre, rol: barbero.rol, email: barbero.email, isStaff: true },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({ message: 'Login exitoso', barbero, token });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
 
 exports.requestOTP = async (req, res) => {
   const { nombre, email, whatsapp } = req.body;
@@ -44,11 +161,9 @@ exports.verifyOTP = async (req, res) => {
     return res.status(401).json({ error: 'Código OTP inválido o expirado' });
   }
 
-  // Clear OTP
   delete otpStore[whatsapp];
 
   try {
-    // Insert or get user from DB
     let user;
     const selectRes = await db.query('SELECT * FROM usuarios WHERE whatsapp = $1', [whatsapp]);
     user = selectRes.rows[0];
@@ -97,43 +212,12 @@ exports.loginBarber = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: barbero.id, nombre: barbero.nombre, rol: barbero.rol, email: barbero.email },
+      { id: barbero.id, nombre: barbero.nombre, rol: barbero.rol, email: barbero.email, isStaff: true },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
     res.json({ message: 'Login exitoso', barbero, token });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-exports.googleLogin = async (req, res) => {
-  const { email, nombre, picture } = req.body;
-  if (!email) {
-    return res.status(400).json({ error: 'Email es requerido' });
-  }
-
-  try {
-    let user;
-    const selectRes = await db.query('SELECT * FROM usuarios WHERE email = $1', [email]);
-    user = selectRes.rows[0];
-
-    if (!user) {
-      const insertRes = await db.query(
-        'INSERT INTO usuarios (nombre, email, whatsapp, verificado, picture) VALUES ($1, $2, $3, 1, $4) RETURNING *',
-        [nombre, email, null, picture || null]
-      );
-      user = insertRes.rows[0];
-    }
-
-    const token = jwt.sign(
-      { id: user.id, nombre: user.nombre, email: user.email, whatsapp: user.whatsapp },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    res.json({ message: 'Login con Google exitoso', user, token, needsPhone: !user.whatsapp });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -166,3 +250,5 @@ exports.completeProfile = async (req, res) => {
 };
 
 exports.verifyAuthToken = verifyToken;
+
+const otpStore = {};

@@ -2,30 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { 
   getTurnos, avisarSiguiente, retrasarAgenda, 
   bloquearHorario, actualizarEstadoTurno, 
-  invitarAdelantar, loginBarber, googleLogin
+  invitarAdelantar, loginBarber 
 } from '../services/api';
-import PinPad from '../components/PinPad';
 import AdminView from './AdminView';
 
 export default function BarberView() {
   const [loggedBarber, setLoggedBarber] = useState(null);
-  const [adminViewMode, setAdminViewMode] = useState('admin'); // 'admin' | 'barber'
-  const [pinError, setPinError] = useState('');
+  const [adminViewMode, setAdminViewMode] = useState('admin');
+  const [loginError, setLoginError] = useState('');
   const [turnos, setTurnos] = useState([]);
   
-  // Controls & Status
   const [status, setStatus] = useState('');
   const [statusType, setStatusType] = useState('info');
   const [retrasoMins, setRetrasoMins] = useState(15);
   const [activeTimer, setActiveTimer] = useState(null);
   const [timerCount, setTimerCount] = useState(0);
 
-  // Block Descanso Form
-  const todayStr = new Date().toISOString().split('T')[0];
-  const [descansoForm, setDescansoForm] = useState({
-    hora_inicio: '12:00',
-    hora_fin: '12:45'
-  });
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   useEffect(() => {
     if (loggedBarber) {
@@ -44,6 +38,8 @@ export default function BarberView() {
     return () => clearInterval(interval);
   }, [activeTimer, timerCount]);
 
+  const todayStr = new Date().toISOString().split('T')[0];
+
   const showStatus = (msg, type = 'info') => {
     setStatus(msg);
     setStatusType(type);
@@ -53,7 +49,6 @@ export default function BarberView() {
   const cargarTurnos = async () => {
     if (!loggedBarber) return;
     try {
-      // Fetch today's appointments
       const data = await getTurnos(loggedBarber.id, todayStr);
       setTurnos(data);
     } catch (err) {
@@ -70,14 +65,19 @@ export default function BarberView() {
     }
   };
 
-  const handleVerifyPin = async (pin) => {
-    setPinError('');
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    
     try {
-      const res = await loginBarber(pin);
+      const res = await loginBarber({ email, password });
       setLoggedBarber(res.barbero);
+      if (res.token) {
+        localStorage.setItem('token', res.token);
+      }
       showStatus(`¡Bienvenido, ${res.barbero.nombre}!`, 'success');
     } catch (err) {
-      setPinError(err.message || 'PIN Incorrecto. Intenta de nuevo.');
+      setLoginError(err.message || 'Credenciales incorrectas. Intenta de nuevo.');
     }
   };
 
@@ -85,7 +85,8 @@ export default function BarberView() {
     setLoggedBarber(null);
     setTurnos([]);
     setActiveTimer(null);
-    setPinError('');
+    setLoginError('');
+    localStorage.removeItem('token');
   };
 
   const handleAvisar = async (turno) => {
@@ -93,7 +94,7 @@ export default function BarberView() {
       showStatus(`Avisando a ${turno.usuario_nombre}...`);
       await avisarSiguiente(turno.id);
       setActiveTimer({ id: turno.id, nombre: turno.usuario_nombre });
-      setTimerCount(5); // 5 SEGUNDOS PARA MODO TEST RÁPIDO
+      setTimerCount(5);
       showStatus('✅ Aviso enviado por WhatsApp', 'success');
     } catch (err) {
       showStatus('Error al avisar por WhatsApp', 'error');
@@ -104,7 +105,6 @@ export default function BarberView() {
     if (!turnos.length) return showStatus('No tienes citas pendientes para retrasar', 'error');
     try {
       showStatus('Retrasando agenda...');
-      // Get the earliest pending appointment time as start point
       const primerPendiente = turnos.find(t => t.estado_turno === 'pendiente');
       if (!primerPendiente) return showStatus('No hay turnos pendientes para retrasar', 'error');
 
@@ -160,11 +160,53 @@ export default function BarberView() {
 
   const timerProgress = activeTimer ? (timerCount / 5) * 100 : 0;
 
-  // View: Login PIN pad
+  const [descansoForm, setDescansoForm] = useState({ hora_inicio: '12:00', hora_fin: '12:45' });
+
+  // View: Login form
   if (!loggedBarber) {
     return (
-      <div className="py-8">
-        <PinPad onVerify={handleVerifyPin} error={pinError} />
+      <div className="max-w-sm mx-auto py-8 px-4">
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--gold), var(--gold-dark))' }}>
+            <span className="text-3xl">💈</span>
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-1">Acceso Staff</h2>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Ingresa con tu email y contraseña</p>
+        </div>
+
+        <form onSubmit={handleLogin} className="space-y-5">
+          <div className="card p-4">
+            <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="trabajador@barber.com"
+              required
+              className="w-full bg-transparent text-white placeholder-[var(--text-muted)] outline-none text-base"
+            />
+          </div>
+
+          <div className="card p-4">
+            <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Contraseña</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+              className="w-full bg-transparent text-white placeholder-[var(--text-muted)] outline-none text-base"
+            />
+          </div>
+
+          {loginError && (
+            <div className="bg-red-900/20 border border-red-800/50 rounded-xl p-3 text-center">
+              <p className="text-red-400 text-sm">{loginError}</p>
+            </div>
+          )}
+
+          <button type="submit" className="btn-gold w-full py-4">Entrar</button>
+        </form>
       </div>
     );
   }
@@ -173,7 +215,6 @@ export default function BarberView() {
   if (loggedBarber.rol === 'admin' && adminViewMode === 'admin') {
     return (
       <div className="space-y-4">
-        {/* Toggle View Mode Bar */}
         <div className="max-w-2xl mx-auto flex gap-2">
           <button className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-[var(--gold)] text-[#0A0A0A] shadow-md transition-all duration-200 cursor-pointer">
             👑 Panel Administrador
@@ -207,7 +248,6 @@ export default function BarberView() {
         </div>
       )}
 
-      {/* Header card */}
       <div className="card">
         <div className="flex justify-between items-center">
           <div>
@@ -222,7 +262,6 @@ export default function BarberView() {
         </div>
       </div>
 
-      {/* Timer for WhatsApp notification response */}
       {activeTimer && (
         <div className="card border-red-500/30 animate-pulse">
           <div className="flex items-center justify-between mb-3">
@@ -238,16 +277,13 @@ export default function BarberView() {
         </div>
       )}
 
-      {/* Status notification toast */}
       {status && (
         <div className={statusType === 'error' ? 'toast-error animate-shake' : statusType === 'success' ? 'toast-success' : 'toast-info'}>
           {status}
         </div>
       )}
 
-      {/* Barber controls (Retrasar / Invitar a adelantar) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Delay Control */}
         <div className="card space-y-3">
           <label className="label">⏱ Retrasar mi Agenda</label>
           <div className="flex gap-2">
@@ -266,7 +302,6 @@ export default function BarberView() {
           </div>
         </div>
 
-        {/* Invite Flexible clients Cascade Control */}
         <div className="card flex flex-col justify-between">
           <div>
             <label className="label">⚡ Adelantar Clientes</label>
@@ -283,7 +318,6 @@ export default function BarberView() {
         </div>
       </div>
 
-      {/* Rest block (Descanso) Control */}
       <form onSubmit={handleBloquearDescanso} className="card space-y-3">
         <label className="label flex items-center gap-1.5">
           <span>☕</span> Registrar Hora de Descanso
@@ -313,7 +347,6 @@ export default function BarberView() {
         </button>
       </form>
 
-      {/* Daily schedule turn list */}
       <div className="space-y-3">
         <div className="flex justify-between items-center px-1">
           <label className="label">Mi Agenda de Hoy</label>
@@ -330,14 +363,13 @@ export default function BarberView() {
         ) : (
           turnos.map((t) => (
             <div key={t.id} className="card relative overflow-hidden flex flex-col justify-between gap-3">
-              {/* Status color indicator */}
               <div 
                 className="absolute top-0 left-0 w-1.5 h-full" 
                 style={{ 
                   background: t.estado_turno === 'bloqueado' 
                     ? '#EF4444' 
                     : t.estado_turno === 'asistio' 
-                    ? '#10B981' 
+                    ? '#10B981'
                     : t.estado_turno === 'no_asistio'
                     ? '#EF4444'
                     : 'var(--gold)' 
@@ -379,7 +411,6 @@ export default function BarberView() {
                 )}
               </div>
 
-              {/* Status transition action controls */}
               {t.estado_turno === 'pendiente' && (
                 <div className="pl-3.5 flex gap-2 pt-1.5 border-t border-white/5">
                   <button 

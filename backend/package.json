@@ -10,8 +10,10 @@
   },
   "dependencies": {
     "@zavudev/sdk": "^0.46.0",
+    "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "express": "^4.19.2",
+    "google-auth-library": "^9.10.0",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.22.0"
   },

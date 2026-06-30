@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { requestOTP, verifyOTP, getBarberos, getTurnos, crearTurno, getServicios, googleLogin } from '../services/api';
+import { getBarberos, getTurnos, crearTurno, getServicios } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import GoogleLoginButton from '../components/GoogleLoginButton';
 
@@ -18,9 +18,6 @@ export default function ClientView() {
   const [user, setUser] = useState(getStoredUser());
   const [step, setStep] = useState(user ? 'booking' : 'login');
   
-  const [formData, setFormData] = useState({ nombre: '', email: '', whatsapp: '' });
-  const [otp, setOtp] = useState('');
-  
   const [barberos, setBarberos] = useState([]);
   const [selectedBarbero, setSelectedBarbero] = useState(null);
 
@@ -34,7 +31,7 @@ export default function ClientView() {
   
   const [preferencia, setPreferencia] = useState('hora_fija');
   const [status, setStatus] = useState('');
-  const [statusType, setStatusType] = useState('info'); // info | error | success
+  const [statusType, setStatusType] = useState('info');
 
   const generadorHoras = () => {
     const horas = [];
@@ -72,40 +69,36 @@ export default function ClientView() {
     if (type !== 'error') setTimeout(() => setStatus(''), 4500);
   };
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    showStatus('Enviando código por WhatsApp...');
-    try {
-      await requestOTP(formData);
-      setStep('otp');
-      setStatus('');
-    } catch (err) {
-      showStatus('Error al solicitar el código', 'error');
-    }
-  };
+  /* ==================== LOGIN ==================== */
+  const renderLogin = () => (
+    <div className="animate-fadeslideup space-y-8">
+      <div className="text-center">
+        <div className="w-20 h-20 mx-auto mb-5 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--gold), var(--gold-dark))', boxShadow: '0 8px 32px rgba(201,168,76,0.3)' }}>
+          <span className="text-4xl">💈</span>
+        </div>
+        <h2 className="section-title text-3xl font-bold text-white mb-2">Jimmy Barber</h2>
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Agenda tu turno en segundos</p>
+      </div>
 
-  const handleVerify = async (e) => {
-    e.preventDefault();
-    showStatus('Verificando código...');
-    try {
-      const res = await verifyOTP({ ...formData, otp });
-      if (res.error) {
-        showStatus(res.error, 'error');
-        return;
-      }
-      setUser(res.user);
-      setStep('booking');
-      setStatus('');
-    } catch (err) {
-      showStatus('Código incorrecto. Revisa tu WhatsApp.', 'error');
-    }
-  };
+      <div className="gold-divider"></div>
 
+      <GoogleLoginButton onLogin={(data) => {
+        if (data.needsPhone) {
+          navigate('/complete-profile');
+        } else {
+          setUser(data);
+          setStep('booking');
+        }
+      }} />
+    </div>
+  );
+
+  /* ==================== BOOKING ==================== */
   const handleBooking = async (e) => {
     e.preventDefault();
     if (!user || !user.id) {
       setStep('login');
-      return showStatus('Tu sesión expiró. Ingresa tu WhatsApp de nuevo.', 'error');
+      return showStatus('Tu sesión expiró. Inicia sesión de nuevo.', 'error');
     }
     if (!selectedServicio) return showStatus('Elige un servicio primero', 'error');
     if (!selectedBarbero || !fecha || !hora) return showStatus('Selecciona barbero, fecha y hora', 'error');
@@ -134,74 +127,6 @@ export default function ClientView() {
     }
   };
 
-  /* ==================== LOGIN ==================== */
-  const renderLogin = () => (
-    <div className="animate-fadeslideup space-y-8">
-      <div className="text-center">
-        <div className="w-20 h-20 mx-auto mb-5 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--gold), var(--gold-dark))', boxShadow: '0 8px 32px rgba(201,168,76,0.3)' }}>
-          <span className="text-4xl">💈</span>
-        </div>
-        <h2 className="section-title text-3xl font-bold text-white mb-2">Jimmy Barber</h2>
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Agenda tu turno en segundos</p>
-      </div>
-
-      <div className="gold-divider"></div>
-
-      <div className="space-y-5">
-        <GoogleLoginButton onLogin={(data) => {
-          if (data.needsPhone) {
-            navigate('/complete-profile');
-          } else {
-            setUser(data);
-            setStep('booking');
-          }
-        }} />
-        
-        <div className="relative flex items-center">
-          <div className="flex-1 h-px" style={{ background: 'var(--border)' }}></div>
-          <span className="px-3 text-xs" style={{ color: 'var(--text-muted)' }}>O usa WhatsApp</span>
-          <div className="flex-1 h-px" style={{ background: 'var(--border)' }}></div>
-        </div>
-
-        <form onSubmit={handleLogin} className="space-y-5">
-          <div>
-            <label className="label">Nombre Completo</label>
-            <input required type="text" className="input-dark" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} placeholder="Ej: Carlos Pérez" />
-          </div>
-          <div>
-            <label className="label">WhatsApp</label>
-            <input required type="tel" className="input-dark" value={formData.whatsapp} onChange={e => setFormData({...formData, whatsapp: e.target.value})} placeholder="Ej: 3001234567" />
-          </div>
-          <button type="submit" className="btn-gold">Recibir Código por WhatsApp</button>
-        </form>
-      </div>
-    </div>
-  );
-
-  /* ==================== OTP ==================== */
-  const renderOTP = () => (
-    <form onSubmit={handleVerify} className="animate-fadeslideup space-y-8 text-center">
-      <div>
-        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid var(--border)' }}>
-          <span className="text-3xl">🔐</span>
-        </div>
-        <h2 className="section-title text-2xl font-bold text-white mb-2">Verifica tu Número</h2>
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Ingresa el código de 4 dígitos enviado a <span className="text-white font-medium">{formData.whatsapp}</span></p>
-      </div>
-      
-      <input 
-        required type="text" maxLength="4" 
-        className="input-dark w-48 mx-auto text-center text-3xl tracking-[0.5em] font-bold" 
-        style={{ letterSpacing: '0.5em' }}
-        value={otp} onChange={e => setOtp(e.target.value)} placeholder="• • • •" 
-      />
-      
-      <button type="submit" className="btn-gold">Verificar y Continuar</button>
-      <button type="button" onClick={() => setStep('login')} className="btn-ghost block mx-auto">← Volver</button>
-    </form>
-  );
-
-  /* ==================== BOOKING ==================== */
   const renderBooking = () => (
     <form onSubmit={handleBooking} className="animate-fadeslideup space-y-6">
       <div className="flex items-center justify-between">
@@ -291,7 +216,6 @@ export default function ClientView() {
             <div className="grid grid-cols-4 gap-2 card-inner max-h-56 overflow-y-auto">
               {bloquesHoras.map(bloque => {
                 const dateTimeStr = `${fecha} ${bloque}`;
-                // Check if slot is occupied
                 const isOcupado = turnosOcupados.some(t => {
                   const tInicio = new Date(t.hora_inicio.replace(' ', 'T')).getTime();
                   const tFin = new Date(t.hora_fin.replace(' ', 'T')).getTime();
@@ -337,6 +261,7 @@ export default function ClientView() {
               >
                 <div className="flex items-center gap-3">
                   <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${preferencia === 'puedo_adelantar' ? 'border-[var(--gold)]' : 'border-white/20'}`}>
+                    {preferencia === 'puedo_adelantar' ? 'border-[var(--gold)]' : 'border-white/20'}
                     {preferencia === 'puedo_adelantar' && <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--gold)' }}></div>}
                   </div>
                   <div>
@@ -422,12 +347,10 @@ export default function ClientView() {
   /* ==================== WRAPPER ==================== */
   return (
     <div className="card max-w-md mx-auto relative overflow-hidden">
-      {/* Background accent */}
       <div className="absolute -top-20 -right-20 w-40 h-40 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(201,168,76,0.08), transparent 70%)' }}></div>
       
       <div className="relative z-10">
         {step === 'login' && renderLogin()}
-        {step === 'otp' && renderOTP()}
         {step === 'booking' && renderBooking()}
         {step === 'success' && renderSuccess()}
         
