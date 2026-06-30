@@ -244,6 +244,10 @@ exports.completeProfile = async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    // Enviar mensaje de bienvenida vía Zavu
+    const welcomeMessage = `¡Hola ${user.nombre}! Tu número de WhatsApp ha sido verificado exitosamente en Jimmy Barber. Ya puedes reservar turnos.`;
+    await enviarMensajeWhatsApp(phone_number, welcomeMessage);
+
     res.json({ message: 'Perfil completado', user, token });
   } catch (err) {
     res.status(500).json({ error: err.message });
