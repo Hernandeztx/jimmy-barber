@@ -27,6 +27,7 @@ app.get('/auth/google/callback', authController.googleAuthCallback);
 app.get('/barberos', barberosController.getBarberos);
 app.get('/servicios', serviciosController.getServicios);
 app.post('/auth/complete-profile', authController.completeProfile);
+app.post('/auth/verify-otp-complete', authController.verifyOTPAndComplete);
 
 // Configure port and listen on all interfaces (0.0.0.0) for local network access
 const PORT = process.env.PORT || 3000;

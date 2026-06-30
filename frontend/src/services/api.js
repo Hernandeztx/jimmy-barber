@@ -178,6 +178,17 @@ export const completeUserProfile = async (data) => {
   return response.json();
 };
 
+export const verifyOTPComplete = async (data) => {
+  const response = await fetch(`${BASE_URL}/auth/verify-otp-complete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  const res = await response.json();
+  if (!response.ok) throw new Error(res.error || 'Error de verificación');
+  return res;
+};
+
 // ── Staff Management ──────────────────────────────────────────────────────────
 
 export const inviteStaff = async (data) => {

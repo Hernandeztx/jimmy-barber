@@ -232,23 +232,58 @@ exports.completeProfile = async (req, res) => {
   }
 
   try {
+    // Guardar número temporalmente y generar OTP
+    const otp = generarOTP();
+    otpStore[phone_number] = { otp, userId, timestamp: Date.now() };
+
+    // Enviar OTP por WhatsApp
+    const nombre = await db.query('SELECT nombre FROM usuarios WHERE id = $1', [userId]);
+    const userName = nombre.rows[0]?.nombre || 'Usuario';
+    
+    const texto = `Hola ${userName}, tu código de verificación para Jimmy Barber es: *${otp}*. Válido por 5 minutos.`;
+    await enviarMensajeWhatsApp(phone_number, texto);
+
+    res.json({ message: 'Código OTP enviado. Ingresa el código para verificar.', needsOTP: true });
+  } catch (err) {
+    console.error('Error en completeProfile:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.verifyOTPAndComplete = async (req, res) => {
+  const { phone_number, otp } = req.body;
+  
+  if (!phone_number || !otp) {
+    return res.status(400).json({ error: 'phone_number y otp son requeridos' });
+  }
+
+  const stored = otpStore[phone_number];
+  if (!stored || stored.otp !== otp) {
+    return res.status(401).json({ error: 'Código OTP inválido o expirado' });
+  }
+
+  // Verificar expiración (5 minutos)
+  if (Date.now() - stored.timestamp > 5 * 60 * 1000) {
+    delete otpStore[phone_number];
+    return res.status(401).json({ error: 'Código OTP expirado' });
+  }
+
+  delete otpStore[phone_number];
+
+  try {
     const updateRes = await db.query(
       'UPDATE usuarios SET whatsapp = $1 WHERE id = $2 RETURNING *',
-      [phone_number, userId]
+      [phone_number, stored.userId]
     );
 
     const user = updateRes.rows[0];
     const token = jwt.sign(
-      { id: user.id, nombre: user.nombre, email: user.email, whatsapp: user.whatsapp },
+      { id: user.id, nombre: user.nombre, email: user.email, whatsapp: user.whatsapp, isStaff: false },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    // Enviar mensaje de bienvenida vía Zavu
-    const welcomeMessage = `¡Hola ${user.nombre}! Tu número de WhatsApp ha sido verificado exitosamente en Jimmy Barber. Ya puedes reservar turnos.`;
-    await enviarMensajeWhatsApp(phone_number, welcomeMessage);
-
-    res.json({ message: 'Perfil completado', user, token });
+    res.json({ message: 'Verificación exitosa', user, token });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
